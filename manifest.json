@@ -1,0 +1,10 @@
+{
+  "Name": "Grimoire of Despair - Ma Dao Thu Tuyet Vong",
+  "Author": "TriNguyen",
+  "Version": "1.0.0",
+  "Description": "Them Ma Dao Thu Tuyet Vong, Diet Ma Kiem, trang thai Dong Hoa Ac Ma, 12 Boss ham mo va su kien Ac Ma Tap Kich Thi Tran.",
+  "UniqueID": "TriNguyen.GrimoireOfDespair",
+  "EntryDll": "GrimoireOfDespair.dll",
+  "MinimumApiVersion": "4.0.0",
+  "UpdateKeys": []
+}
