@@ -1,0 +1,38 @@
+name: Build Stardew Android Mod
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 6.0
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '6.0.x'
+
+      - name: Compile C# Mod
+        run: |
+          dotnet build GrimoireOfDespair.csproj -c Release /p:EnableModDeploy=false /p:EnableModZip=false /p:IgnoreModFilePaths=true
+
+      - name: Package Mod Zip for SMAPI Android
+        run: |
+          mkdir -p release/GrimoireOfDespair/assets
+          cp manifest.json release/GrimoireOfDespair/
+          cp bin/Release/net6.0/GrimoireOfDespair.dll release/GrimoireOfDespair/
+          cp -r assets/* release/GrimoireOfDespair/assets/ || true
+          cd release
+          zip -r ../GrimoireOfDespair-Android.zip GrimoireOfDespair
+
+      - name: Upload Ready-to-Install Android Mod Zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: GrimoireOfDespair-Android
+          path: GrimoireOfDespair-Android.zip
+          
