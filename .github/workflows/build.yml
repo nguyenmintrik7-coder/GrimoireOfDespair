@@ -20,7 +20,7 @@ jobs:
         with:
           dotnet-version: '6.0.x'
 
-      - name: Compile and Create 1-Layer SMAPI Zip
+      - name: Compile DLL and Save to Repo Root
         run: |
           set -e
           mkdir -p refs/mg refs/gd refs/sdv refs/smapi refs/out mod_src
@@ -76,7 +76,6 @@ jobs:
                   public static Color Yellow => new Color(255, 255, 0, 255);
                   public static Color Lime => new Color(0, 255, 0, 255);
                   public static Color Gray => new Color(128, 128, 128, 255);
-                  public static Color OrangeRed => new Color(255, 69, 0, 255);
                   public static Color operator *(Color c, float s) => c;
               }
               public class GameTime { public TimeSpan ElapsedGameTime { get; set; } public TimeSpan TotalGameTime { get; set; } }
@@ -153,96 +152,61 @@ jobs:
 
           cat << 'EOF' > refs/sdv/SDV.cs
           using System;
-          using System.Collections.Generic;
           using Microsoft.Xna.Framework;
           using Microsoft.Xna.Framework.Graphics;
           namespace StardewValley
           {
               public abstract class Item { public string ItemId { get; set; } public string Name { get; set; } }
               public static class ItemRegistry { public static Item Create(string itemId, int amount = 1, int quality = 0, bool allowNull = false) => null; }
-              public class HUDMessage { public HUDMessage(string message) { } public HUDMessage(string message, int whatType) { } }
+              public class HUDMessage { public HUDMessage(string message) { } }
               public class Response { public Response(string responseKey, string responseText) { } }
-              public class ModDataDictionary : Dictionary<string, string> { }
-              public class BuffsDisplay { public void Remove(string id) { } }
-              public class Debris { public Debris(int d, Vector2 p, Color c, float s, Character w) { } }
               public class Character
               {
                   public virtual Vector2 Position { get; set; }
                   public int FacingDirection { get; set; }
-                  public string Name { get; set; }
                   public string displayName { get; set; }
-                  public ModDataDictionary modData { get; set; } = new();
                   public Vector2 getStandingPosition() => Position;
               }
               public class NPC : Character
               {
-                  public bool IsInvisible { get; set; }
-                  public bool HideShadow { get; set; }
                   public void showTextAboveHead(string Text, Color? spriteTextColor = null, int style = 2, int duration = 3000, int preTimer = 0) { }
               }
               public class Farmer : Character
               {
-                  public long UniqueMultiplayerID;
                   public int health; public int maxHealth; public int deepestMineLevel;
                   public bool temporarilyInvincible; public int temporaryInvincibilityTimer;
                   public int Money { get; set; } public Item CurrentItem { get; set; }
-                  public IList<Item> Items { get; set; } = new List<Item>();
-                  public BuffsDisplay buffs { get; set; } = new();
-                  public bool isMoving() => true;
-                  public void addItemToMenuIfNecessary(Item item) { }
-                  public void addItemByMenuIfNecessary(List<Item> items) { }
                   public bool addItemToInventoryBool(Item item, bool makeActiveObject = false) => true;
                   public bool hasItemInInventoryNamed(string name) => false;
                   public void takeDamage(int damage, bool overrideParry, Monsters.Monster damager) { }
                   public void changeFriendship(int amount, NPC n) { }
               }
-              public class NetField<T> { public T Value { get; set; } }
               public class GameLocation
               {
-                  public List<NPC> characters = new();
-                  public List<Projectiles.Projectile> projectiles = new();
-                  public List<Debris> debris = new();
                   public delegate void afterQuestionBehavior(Farmer who, string whichAnswer);
                   public virtual void createQuestionDialogue(string question, Response[] answerChoices, afterQuestionBehavior afterDialogueBehavior, NPC speaker = null) { }
                   public virtual bool damageMonster(Rectangle areaOfEffect, int minDamage, int maxDamage, bool isBomb, Farmer who) => false;
               }
               public static class Utility
               {
-                  public static void addLightSource(int identifier, Vector2 position, float radius, Color color) { }
                   public static void drawTextWithShadow(SpriteBatch b, string text, SpriteFont font, Vector2 position, Color color, float scale = 1f, float layerDepth = -1f, int horizontalShadowOffset = -1, int verticalShadowOffset = -1, float shadowIntensity = 1f, int numShadows = 3) { }
               }
               public static class Game1
               {
                   public static GraphicsDeviceManager graphics; public static GameTime currentGameTime;
                   public static Random random = new Random(); public static float flashAlpha; public static int dayOfMonth;
-                  public static Rectangle clientBounds; public static Rectangle viewport; public static Rectangle uiViewport;
-                  public static SpriteFont smallFont; public static SpriteFont dialogueFont;
+                  public static Rectangle clientBounds; public static SpriteFont smallFont; public static SpriteFont dialogueFont;
                   public static Farmer player { get; set; } public static GameLocation currentLocation { get; set; }
-                  public static object activeClickableMenu;
                   public static void playSound(string cueName, int? pitch = null) { }
                   public static void addHUDMessage(HUDMessage message) { }
                   public static void drawObjectDialogue(string dialogue) { }
                   public static void warpFarmer(string locationName, int tileX, int tileY, int facingDirection) { }
                   public static NPC getCharacterFromName(string name, bool mustBeVillager = true, bool useLocationsListOnly = false) => null;
-                  public static Vector2 GlobalToLocal(Rectangle viewport, Vector2 globalPosition) => globalPosition;
                   public static Vector2 GlobalToLocal(Vector2 globalPosition) => globalPosition;
                   public static object createItemDebris(Item item, Vector2 pixelOrigin, int direction, GameLocation location = null, int groundLevel = -1, bool flopFish = false) => null;
               }
           }
-          namespace StardewValley.Buffs { }
-          namespace StardewValley.Menus { }
-          namespace StardewValley.Tools { }
-          namespace StardewValley.Projectiles { public class Projectile { public NetField<Vector2> position = new(); } }
-          namespace StardewValley.Monsters
-          {
-              public class Monster : NPC
-              {
-                  public int Health { get; set; }
-                  public NetField<bool> isInvincible = new();
-                  public NetField<int> resilience = new();
-                  public NetField<int> moveTowardPlayerThreshold = new();
-              }
-          }
+          namespace StardewValley.Monsters { public class Monster : NPC { } }
           namespace StardewValley.Locations
           {
               public class MineShaft : GameLocation { public int mineLevel; }
@@ -350,4 +314,53 @@ jobs:
           EOF
           dotnet build refs/smapi/StardewModdingAPI.csproj -c Release -o refs/out
 
- 
+          cat << 'EOF' > mod_src/manifest.json
+          {
+            "Name": "Grimoire of Despair - Ma Dao Thu Tuyet Vong",
+            "Author": "TriNguyen",
+            "Version": "1.0.0",
+            "Description": "Them Ma Dao Thu Tuyet Vong, Diet Ma Kiem, trang thai Dong Hoa Ac Ma, 12 Boss ham mo va su kien Ac Ma Tap Kich Thi Tran.",
+            "UniqueID": "TriNguyen.GrimoireOfDespair",
+            "EntryDll": "GrimoireOfDespair.dll",
+            "MinimumApiVersion": "4.0.0",
+            "UpdateKeys": []
+          }
+          EOF
+
+          cat << 'EOF' > mod_src/GrimoireOfDespair.csproj
+          <Project Sdk="Microsoft.NET.Sdk">
+            <PropertyGroup>
+              <AssemblyName>GrimoireOfDespair</AssemblyName>
+              <RootNamespace>GrimoireOfDespair</RootNamespace>
+              <Version>1.0.0</Version>
+              <TargetFramework>net6.0</TargetFramework>
+              <LangVersion>latest</LangVersion>
+            </PropertyGroup>
+            <ItemGroup>
+              <Reference Include="MonoGame.Framework"><HintPath>../refs/out/MonoGame.Framework.dll</HintPath><Private>false</Private></Reference>
+              <Reference Include="StardewValley.GameData"><HintPath>../refs/out/StardewValley.GameData.dll</HintPath><Private>false</Private></Reference>
+              <Reference Include="Stardew Valley"><HintPath>../refs/out/Stardew Valley.dll</HintPath><Private>false</Private></Reference>
+              <Reference Include="StardewModdingAPI"><HintPath>../refs/out/StardewModdingAPI.dll</HintPath><Private>false</Private></Reference>
+            </ItemGroup>
+          </Project>
+          EOF
+
+          cat << 'EOF' > mod_src/ModEntry.cs
+          using System;
+          using System.Collections.Generic;
+          using System.IO;
+          using System.Linq;
+          using Microsoft.Xna.Framework;
+          using Microsoft.Xna.Framework.Graphics;
+          using StardewModdingAPI;
+          using StardewModdingAPI.Events;
+          using StardewValley;
+          using StardewValley.GameData.Objects;
+          using StardewValley.GameData.Weapons;
+          using StardewValley.Locations;
+
+          namespace GrimoireOfDespair
+          {
+              public class ModSaveState
+              {
+                
