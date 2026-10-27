@@ -20,343 +20,182 @@ jobs:
         with:
           dotnet-version: '6.0.x'
 
-      - name: Compile & Package Standard SMAPI Zip
+      - name: Build & Create Zip via Python
         run: |
-          set -e
-          mkdir -p refs/mg refs/gd refs/sdv refs/smapi refs/out mod_src
+          python3 - << 'PYEOF'
+          import os, subprocess, shutil
 
-          cat << 'EOF' > refs/mg/MonoGame.Framework.csproj
-          <Project Sdk="Microsoft.NET.Sdk">
-            <PropertyGroup>
-              <TargetFramework>net6.0</TargetFramework>
-              <AssemblyName>MonoGame.Framework</AssemblyName>
-              <Version>0.0.0.0</Version>
-            </PropertyGroup>
-          </Project>
-          EOF
+          os.makedirs("refs/mg", exist_ok=True)
+          os.makedirs("refs/gd", exist_ok=True)
+          os.makedirs("refs/sdv", exist_ok=True)
+          os.makedirs("refs/smapi", exist_ok=True)
+          os.makedirs("refs/out", exist_ok=True)
+          os.makedirs("mod_src", exist_ok=True)
 
-          cat << 'EOF' > refs/mg/MG.cs
-          using System;
-          namespace Microsoft.Xna.Framework
-          {
-              public struct Point { public int X; public int Y; public Point(int x, int y) { X = x; Y = y; } }
-              public struct Vector2
-              {
-                  public float X; public float Y;
-                  public Vector2(float x, float y) { X = x; Y = y; }
-                  public Vector2(float v) { X = v; Y = v; }
-                  public static Vector2 Zero => new Vector2(0f, 0f);
-                  public float Length() => (float)Math.Sqrt(X * X + Y * Y);
-                  public void Normalize() { float l = Length(); if (l > 0f) { X /= l; Y /= l; } }
-                  public static float Distance(Vector2 a, Vector2 b) => (a - b).Length();
-                  public static Vector2 Lerp(Vector2 a, Vector2 b, float t) => new Vector2(a.X + (b.X - a.X) * t, a.Y + (b.Y - a.Y) * t);
-                  public static Vector2 operator +(Vector2 a, Vector2 b) => new Vector2(a.X + b.X, a.Y + b.Y);
-                  public static Vector2 operator -(Vector2 a, Vector2 b) => new Vector2(a.X - b.X, a.Y - b.Y);
-                  public static Vector2 operator *(Vector2 a, float s) => new Vector2(a.X * s, a.Y * s);
-                  public static Vector2 operator /(Vector2 a, float s) => new Vector2(a.X / s, a.Y / s);
+          # 1. MonoGame stub
+          open("refs/mg/MonoGame.Framework.csproj", "w").write('<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net6.0</TargetFramework><AssemblyName>MonoGame.Framework</AssemblyName></PropertyGroup></Project>')
+          open("refs/mg/MG.cs", "w").write('''using System;
+          namespace Microsoft.Xna.Framework {
+              public struct Point { public int X, Y; public Point(int x, int y){X=x;Y=y;} }
+              public struct Vector2 {
+                  public float X, Y; public Vector2(float x, float y){X=x;Y=y;} public Vector2(float v){X=v;Y=v;}
+                  public static Vector2 Zero => new(0,0);
+                  public float Length() => (float)Math.Sqrt(X*X+Y*Y);
+                  public void Normalize(){ float l=Length(); if(l>0){X/=l;Y/=l;} }
+                  public static float Distance(Vector2 a, Vector2 b) => (a-b).Length();
+                  public static Vector2 Lerp(Vector2 a, Vector2 b, float t) => new(a.X+(b.X-a.X)*t, a.Y+(b.Y-a.Y)*t);
+                  public static Vector2 operator +(Vector2 a, Vector2 b) => new(a.X+b.X, a.Y+b.Y);
+                  public static Vector2 operator -(Vector2 a, Vector2 b) => new(a.X-b.X, a.Y-b.Y);
+                  public static Vector2 operator *(Vector2 a, float s) => new(a.X*s, a.Y*s);
+                  public static Vector2 operator /(Vector2 a, float s) => new(a.X/s, a.Y/s);
               }
-              public struct Rectangle
-              {
-                  public int X; public int Y; public int Width; public int Height;
-                  public Rectangle(int x, int y, int w, int h) { X = x; Y = y; Width = w; Height = h; }
-                  public int Bottom => Y + Height;
-                  public bool Contains(Point p) => p.X >= X && p.X < X + Width && p.Y >= Y && p.Y < Y + Height;
+              public struct Rectangle {
+                  public int X, Y, Width, Height; public Rectangle(int x, int y, int w, int h){X=x;Y=y;Width=w;Height=h;}
+                  public int Bottom => Y+Height;
+                  public bool Contains(Point p) => p.X>=X && p.X<X+Width && p.Y>=Y && p.Y<Y+Height;
               }
-              public struct Color
-              {
-                  public byte R { get; set; } public byte G { get; set; } public byte B { get; set; } public byte A { get; set; }
-                  public Color(int r, int g, int b) { R = (byte)r; G = (byte)g; B = (byte)b; A = 255; }
-                  public Color(int r, int g, int b, int a) { R = (byte)r; G = (byte)g; B = (byte)b; A = (byte)a; }
-                  public static Color White => new Color(255, 255, 255, 255);
-                  public static Color Black => new Color(0, 0, 0, 255);
-                  public static Color Transparent => new Color(0, 0, 0, 0);
-                  public static Color Red => new Color(255, 0, 0, 255);
-                  public static Color Crimson => new Color(220, 20, 60, 255);
-                  public static Color Magenta => new Color(255, 0, 255, 255);
-                  public static Color Yellow => new Color(255, 255, 0, 255);
-                  public static Color Lime => new Color(0, 255, 0, 255);
-                  public static Color Gray => new Color(128, 128, 128, 255);
-                  public static Color operator *(Color c, float s) => c;
+              public struct Color {
+                  public byte R, G, B, A;
+                  public Color(int r, int g, int b){R=(byte)r;G=(byte)g;B=(byte)b;A=255;}
+                  public Color(int r, int g, int b, int a){R=(byte)r;G=(byte)g;B=(byte)b;A=(byte)a;}
+                  public static Color White=>new(255,255,255); public static Color Black=>new(0,0,0);
+                  public static Color Transparent=>new(0,0,0,0); public static Color Red=>new(255,0,0);
+                  public static Color Crimson=>new(220,20,60); public static Color Magenta=>new(255,0,255);
+                  public static Color Yellow=>new(255,255,0); public static Color Lime=>new(0,255,0);
+                  public static Color Gray=>new(128,128,128); public static Color OrangeRed=>new(255,69,0);
+                  public static Color operator *(Color c, float s)=>c;
               }
-              public class GameTime { public TimeSpan ElapsedGameTime { get; set; } public TimeSpan TotalGameTime { get; set; } }
-              public class GraphicsDeviceManager { public Graphics.GraphicsDevice GraphicsDevice { get; set; } = new(); }
+              public class GameTime { public TimeSpan ElapsedGameTime {get;set;} public TimeSpan TotalGameTime {get;set;} }
+              public class GraphicsDeviceManager { public Graphics.GraphicsDevice GraphicsDevice {get;set;} = new(); }
           }
-          namespace Microsoft.Xna.Framework.Graphics
-          {
-              public class GraphicsDevice { }
-              public class Texture2D
-              {
-                  public int Width { get; set; } public int Height { get; set; }
-                  public Texture2D(GraphicsDevice g, int w, int h) { Width = w; Height = h; }
-                  public void GetData<T>(T[] data) where T : struct { }
-                  public void SetData<T>(T[] data) where T : struct { }
+          namespace Microsoft.Xna.Framework.Graphics {
+              public class GraphicsDevice {}
+              public class Texture2D {
+                  public int Width {get;set;} public int Height {get;set;}
+                  public Texture2D(GraphicsDevice g, int w, int h){Width=w;Height=h;}
+                  public void GetData<T>(T[] d) where T:struct {} public void SetData<T>(T[] d) where T:struct {}
               }
-              public class SpriteFont { }
-              public enum SpriteEffects { None = 0, FlipHorizontally = 1, FlipVertically = 2 }
-              public class SpriteBatch
-              {
-                  public void Draw(Texture2D t, Rectangle d, Color c) { }
-                  public void Draw(Texture2D t, Vector2 p, Rectangle? s, Color c, float r, Vector2 o, float sc, SpriteEffects e, float l) { }
+              public class SpriteFont {}
+              public enum SpriteEffects { None=0, FlipHorizontally=1, FlipVertically=2 }
+              public class SpriteBatch {
+                  public void Draw(Texture2D t, Rectangle d, Color c){}
+                  public void Draw(Texture2D t, Vector2 p, Rectangle? s, Color c, float r, Vector2 o, float sc, SpriteEffects e, float l){}
               }
-          }
-          EOF
-          dotnet build refs/mg/MonoGame.Framework.csproj -c Release -o refs/out
+          }''')
+          subprocess.run(["dotnet", "build", "refs/mg/MonoGame.Framework.csproj", "-c", "Release", "-o", "refs/out"], check=True)
 
-          cat << 'EOF' > refs/gd/StardewValley.GameData.csproj
-          <Project Sdk="Microsoft.NET.Sdk">
-            <PropertyGroup>
-              <TargetFramework>net6.0</TargetFramework>
-              <AssemblyName>StardewValley.GameData</AssemblyName>
-              <Version>0.0.0.0</Version>
-            </PropertyGroup>
-          </Project>
-          EOF
+          # 2. GameData stub
+          open("refs/gd/StardewValley.GameData.csproj", "w").write('<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net6.0</TargetFramework><AssemblyName>StardewValley.GameData</AssemblyName></PropertyGroup></Project>')
+          open("refs/gd/GD.cs", "w").write('''namespace StardewValley.GameData.Objects { public class ObjectData { public string Name, DisplayName, Description, Type, Texture; public int Category, Price, SpriteIndex; } }
+          namespace StardewValley.GameData.Weapons { public class WeaponData { public string Name, DisplayName, Description, Texture; public int MinDamage, MaxDamage, Speed, AddedPrecision, AddedDefense, Type, SpriteIndex; public float Knockback, CritChance, CritMultiplier; } }''')
+          subprocess.run(["dotnet", "build", "refs/gd/StardewValley.GameData.csproj", "-c", "Release", "-o", "refs/out"], check=True)
 
-          cat << 'EOF' > refs/gd/GD.cs
-          namespace StardewValley.GameData.Objects
-          {
-              public class ObjectData
-              {
-                  public string Name { get; set; } public string DisplayName { get; set; } public string Description { get; set; }
-                  public string Type { get; set; } public int Category { get; set; } public int Price { get; set; }
-                  public string Texture { get; set; } public int SpriteIndex { get; set; }
+          # 3. Stardew Valley stub
+          open("refs/sdv/StardewValley.csproj", "w").write('<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net6.0</TargetFramework><AssemblyName>Stardew Valley</AssemblyName></PropertyGroup><ItemGroup><Reference Include="MonoGame.Framework"><HintPath>../out/MonoGame.Framework.dll</HintPath></Reference><Reference Include="StardewValley.GameData"><HintPath>../out/StardewValley.GameData.dll</HintPath></Reference></ItemGroup></Project>')
+          open("refs/sdv/SDV.cs", "w").write('''using System; using System.Collections.Generic; using Microsoft.Xna.Framework; using Microsoft.Xna.Framework.Graphics;
+          namespace StardewValley {
+              public abstract class Item { public string ItemId {get;set;} public string Name {get;set;} }
+              public static class ItemRegistry { public static Item Create(string id, int a=1, int q=0, bool n=false)=>null; }
+              public class HUDMessage { public HUDMessage(string m){} public HUDMessage(string m, int t){} }
+              public class Response { public Response(string k, string t){} }
+              public class ModDataDictionary : Dictionary<string, string> { public new bool TryGetValue(string k, out string v) => base.TryGetValue(k, out v); }
+              public class BuffsDisplay { public void Remove(string id){} }
+              public class Debris { public Debris(int d, Vector2 p, Color c, float s, Character w){} }
+              public class Character { public virtual Vector2 Position {get;set;} public int FacingDirection {get;set;} public string Name {get;set;} public string displayName {get;set;} public ModDataDictionary modData {get;set;} = new(); public Vector2 getStandingPosition()=>Position; }
+              public class NPC : Character { public bool IsInvisible {get;set;} public bool HideShadow {get;set;} public void showTextAboveHead(string t, Color? c=null, int s=2, int d=3000, int p=0){} }
+              public class Farmer : Character {
+                  public long UniqueMultiplayerID; public int health, maxHealth, deepestMineLevel, temporaryInvincibilityTimer; public bool temporarilyInvincible;
+                  public int Money {get;set;} public Item CurrentItem {get;set;} public IList<Item> Items {get;set;} = new List<Item>(); public BuffsDisplay buffs {get;set;} = new();
+                  public bool isMoving()=>true; public void addItemToMenuIfNecessary(Item i){} public void addItemByMenuIfNecessary(List<Item> i){}
+                  public bool addItemToInventoryBool(Item i, bool m=false)=>true; public void takeDamage(int d, bool o, Monsters.Monster m){} public void changeFriendship(int a, NPC n){}
               }
-          }
-          namespace StardewValley.GameData.Weapons
-          {
-              public class WeaponData
-              {
-                  public string Name { get; set; } public string DisplayName { get; set; } public string Description { get; set; }
-                  public int MinDamage { get; set; } public int MaxDamage { get; set; } public float Knockback { get; set; }
-                  public int Speed { get; set; } public int AddedPrecision { get; set; } public int AddedDefense { get; set; }
-                  public int Type { get; set; } public float CritChance { get; set; } public float CritMultiplier { get; set; }
-                  public string Texture { get; set; } public int SpriteIndex { get; set; }
-              }
-          }
-          EOF
-          dotnet build refs/gd/StardewValley.GameData.csproj -c Release -o refs/out
-
-          cat << 'EOF' > refs/sdv/StardewValley.csproj
-          <Project Sdk="Microsoft.NET.Sdk">
-            <PropertyGroup>
-              <TargetFramework>net6.0</TargetFramework>
-              <AssemblyName>Stardew Valley</AssemblyName>
-              <Version>0.0.0.0</Version>
-            </PropertyGroup>
-            <ItemGroup>
-              <Reference Include="MonoGame.Framework"><HintPath>../out/MonoGame.Framework.dll</HintPath></Reference>
-              <Reference Include="StardewValley.GameData"><HintPath>../out/StardewValley.GameData.dll</HintPath></Reference>
-            </ItemGroup>
-          </Project>
-          EOF
-
-          cat << 'EOF' > refs/sdv/SDV.cs
-          using System;
-          using Microsoft.Xna.Framework;
-          using Microsoft.Xna.Framework.Graphics;
-          namespace StardewValley
-          {
-              public abstract class Item { public string ItemId { get; set; } public string Name { get; set; } }
-              public static class ItemRegistry { public static Item Create(string itemId, int amount = 1, int quality = 0, bool allowNull = false) => null; }
-              public class HUDMessage { public HUDMessage(string message) { } }
-              public class Response { public Response(string responseKey, string responseText) { } }
-              public class Character
-              {
-                  public virtual Vector2 Position { get; set; }
-                  public int FacingDirection { get; set; }
-                  public string displayName { get; set; }
-                  public Vector2 getStandingPosition() => Position;
-              }
-              public class NPC : Character
-              {
-                  public void showTextAboveHead(string Text, Color? spriteTextColor = null, int style = 2, int duration = 3000, int preTimer = 0) { }
-              }
-              public class Farmer : Character
-              {
-                  public int health; public int maxHealth; public int deepestMineLevel;
-                  public bool temporarilyInvincible; public int temporaryInvincibilityTimer;
-                  public int Money { get; set; } public Item CurrentItem { get; set; }
-                  public bool addItemToInventoryBool(Item item, bool makeActiveObject = false) => true;
-                  public bool hasItemInInventoryNamed(string name) => false;
-                  public void takeDamage(int damage, bool overrideParry, Monsters.Monster damager) { }
-                  public void changeFriendship(int amount, NPC n) { }
-              }
-              public class GameLocation
-              {
+              public class NetField<T> { public T Value {get;set;} }
+              public class GameLocation {
+                  public List<NPC> characters = new(); public List<Projectiles.Projectile> projectiles = new(); public List<Debris> debris = new();
                   public delegate void afterQuestionBehavior(Farmer who, string whichAnswer);
-                  public virtual void createQuestionDialogue(string question, Response[] answerChoices, afterQuestionBehavior afterDialogueBehavior, NPC speaker = null) { }
-                  public virtual bool damageMonster(Rectangle areaOfEffect, int minDamage, int maxDamage, bool isBomb, Farmer who) => false;
+                  public virtual void createQuestionDialogue(string q, Response[] a, afterQuestionBehavior b, NPC s=null){}
+                  public virtual bool damageMonster(Rectangle a, int min, int max, bool b, Farmer w)=>false;
               }
-              public static class Utility
-              {
-                  public static void drawTextWithShadow(SpriteBatch b, string text, SpriteFont font, Vector2 position, Color color, float scale = 1f, float layerDepth = -1f, int horizontalShadowOffset = -1, int verticalShadowOffset = -1, float shadowIntensity = 1f, int numShadows = 3) { }
+              public static class Utility {
+                  public static void addLightSource(int id, Vector2 p, float r, Color c){}
+                  public static void drawTextWithShadow(SpriteBatch b, string t, SpriteFont f, Vector2 p, Color c, float s=1f, float l=-1f, int hx=-1, int hy=-1, float si=1f, int ns=3){}
               }
-              public static class Game1
-              {
-                  public static GraphicsDeviceManager graphics; public static GameTime currentGameTime;
-                  public static Random random = new Random(); public static float flashAlpha; public static int dayOfMonth;
-                  public static Rectangle clientBounds; public static SpriteFont smallFont; public static SpriteFont dialogueFont;
-                  public static Farmer player { get; set; } public static GameLocation currentLocation { get; set; }
-                  public static void playSound(string cueName, int? pitch = null) { }
-                  public static void addHUDMessage(HUDMessage message) { }
-                  public static void drawObjectDialogue(string dialogue) { }
-                  public static void warpFarmer(string locationName, int tileX, int tileY, int facingDirection) { }
-                  public static NPC getCharacterFromName(string name, bool mustBeVillager = true, bool useLocationsListOnly = false) => null;
-                  public static Vector2 GlobalToLocal(Vector2 globalPosition) => globalPosition;
-                  public static object createItemDebris(Item item, Vector2 pixelOrigin, int direction, GameLocation location = null, int groundLevel = -1, bool flopFish = false) => null;
+              public static class Game1 {
+                  public static GraphicsDeviceManager graphics; public static GameTime currentGameTime; public static Random random = new();
+                  public static float flashAlpha; public static int dayOfMonth; public static Rectangle viewport, uiViewport;
+                  public static SpriteFont smallFont, dialogueFont; public static Farmer player {get;set;} public static GameLocation currentLocation {get;set;}
+                  public static object activeClickableMenu;
+                  public static void playSound(string c, int? p=null){} public static void addHUDMessage(HUDMessage m){}
+                  public static void drawObjectDialogue(string d){} public static void warpFarmer(string l, int x, int y, int d){}
+                  public static NPC getCharacterFromName(string n, bool m=true, bool u=false)=>null;
+                  public static Vector2 GlobalToLocal(Rectangle v, Vector2 p)=>p; public static Vector2 GlobalToLocal(Vector2 p)=>p;
+                  public static object createItemDebris(Item i, Vector2 p, int d, GameLocation l=null, int g=-1, bool f=false)=>null;
               }
           }
-          namespace StardewValley.Monsters { public class Monster : NPC { } }
-          namespace StardewValley.Locations
-          {
-              public class MineShaft : GameLocation { public int mineLevel; }
-              public class Town : GameLocation { }
-          }
-          EOF
-          dotnet build refs/sdv/StardewValley.csproj -c Release -o refs/out
+          namespace StardewValley.Buffs {} namespace StardewValley.Menus {} namespace StardewValley.Tools {}
+          namespace StardewValley.Projectiles { public class Projectile { public NetField<Vector2> position = new(); } }
+          namespace StardewValley.Monsters { public class Monster : NPC { public int Health {get;set;} public NetField<bool> isInvincible = new(); public NetField<int> resilience = new(); public NetField<int> moveTowardPlayerThreshold = new(); } }
+          namespace StardewValley.Locations { public class MineShaft : GameLocation { public int mineLevel; } public class Town : GameLocation {} }''')
+          subprocess.run(["dotnet", "build", "refs/sdv/StardewValley.csproj", "-c", "Release", "-o", "refs/out"], check=True)
 
-          cat << 'EOF' > refs/smapi/StardewModdingAPI.csproj
-          <Project Sdk="Microsoft.NET.Sdk">
-            <PropertyGroup>
-              <TargetFramework>net6.0</TargetFramework>
-              <AssemblyName>StardewModdingAPI</AssemblyName>
-              <Version>0.0.0.0</Version>
-            </PropertyGroup>
-            <ItemGroup>
-              <Reference Include="MonoGame.Framework"><HintPath>../out/MonoGame.Framework.dll</HintPath></Reference>
-              <Reference Include="Stardew Valley"><HintPath>../out/Stardew Valley.dll</HintPath></Reference>
-            </ItemGroup>
-          </Project>
-          EOF
-
-          cat << 'EOF' > refs/smapi/SMAPI.cs
-          using System;
-          using System.Collections.Generic;
-          using Microsoft.Xna.Framework;
-          using Microsoft.Xna.Framework.Graphics;
-          namespace StardewModdingAPI
-          {
-              public enum LogLevel { Trace, Debug, Info, Warn, Error, Alert }
-              public enum SButton { None = 0 }
-              public static class SButtonExtensions
-              {
-                  public static bool IsUseToolButton(this SButton button) => false;
-                  public static bool IsActionButton(this SButton button) => false;
-              }
-              public interface IMonitor { void Log(string message, LogLevel level = LogLevel.Trace); }
-              public interface IModContentHelper { T Load<T>(string relativePath) where T : notnull; }
-              public interface IInputHelper { void Suppress(SButton button); }
-              public interface IDataHelper
-              {
-                  TModel ReadSaveData<TModel>(string key) where TModel : class;
-                  void WriteSaveData<TModel>(string key, TModel data) where TModel : class;
-              }
-              public interface IModHelper
-              {
-                  string DirectoryPath { get; } Events.IModEvents Events { get; }
-                  IModContentHelper ModContent { get; } IInputHelper Input { get; } IDataHelper Data { get; }
-              }
-              public abstract class Mod
-              {
-                  public IMonitor Monitor { get; set; } public IModHelper Helper { get; set; }
-                  public abstract void Entry(IModHelper helper);
-              }
-              public static class Context { public static bool IsWorldReady { get; } public static bool IsPlayerFree { get; } }
-              public interface IAssetName { bool IsEquivalentTo(string otherName, bool useBaseName = false); }
-              public enum AssetLoadPriority { Low = -1000, Medium = 0, High = 1000, Exclusive = 2147483647 }
-              public enum AssetEditPriority { Early = -1000, Default = 0, Late = 1000 }
-              public interface IAssetDataForDictionary<TKey, TValue> { IDictionary<TKey, TValue> Data { get; } }
-              public interface IAssetData { IAssetDataForDictionary<TKey, TValue> AsDictionary<TKey, TValue>(); }
-              public interface ICursorPosition { Vector2 ScreenPixels { get; } }
+          # 4. SMAPI stub
+          open("refs/smapi/StardewModdingAPI.csproj", "w").write('<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net6.0</TargetFramework><AssemblyName>StardewModdingAPI</AssemblyName></PropertyGroup><ItemGroup><Reference Include="MonoGame.Framework"><HintPath>../out/MonoGame.Framework.dll</HintPath></Reference><Reference Include="Stardew Valley"><HintPath>../out/Stardew Valley.dll</HintPath></Reference></ItemGroup></Project>')
+          open("refs/smapi/SMAPI.cs", "w").write('''using System; using System.Collections.Generic; using Microsoft.Xna.Framework; using Microsoft.Xna.Framework.Graphics;
+          namespace StardewModdingAPI {
+              public enum LogLevel { Trace, Debug, Info, Warn, Error, Alert } public enum SButton { None=0 }
+              public static class SButtonExtensions { public static bool IsUseToolButton(this SButton b)=>false; public static bool IsActionButton(this SButton b)=>false; }
+              public interface IMonitor { void Log(string m, LogLevel l=LogLevel.Trace); }
+              public interface IModContentHelper { T Load<T>(string p) where T:notnull; }
+              public interface IInputHelper { void Suppress(SButton b); }
+              public interface IDataHelper { T ReadSaveData<T>(string k) where T:class; void WriteSaveData<T>(string k, T d) where T:class; }
+              public interface IModHelper { string DirectoryPath {get;} Events.IModEvents Events {get;} IModContentHelper ModContent {get;} IInputHelper Input {get;} IDataHelper Data {get;} }
+              public abstract class Mod { public IMonitor Monitor {get;set;} public IModHelper Helper {get;set;} public abstract void Entry(IModHelper h); }
+              public static class Context { public static bool IsWorldReady {get;} public static bool IsPlayerFree {get;} }
+              public interface IAssetName { bool IsEquivalentTo(string n, bool b=false); }
+              public enum AssetLoadPriority { Low=-1000, Medium=0, High=1000, Exclusive=2147483647 }
+              public enum AssetEditPriority { Early=-1000, Default=0, Late=1000 }
+              public interface IAssetDataForDictionary<K,V> { IDictionary<K,V> Data {get;} }
+              public interface IAssetData { IAssetDataForDictionary<K,V> AsDictionary<K,V>(); }
+              public interface ICursorPosition { Vector2 ScreenPixels {get;} }
           }
-          namespace StardewModdingAPI.Events
-          {
-              public interface IGameLoopEvents
-              {
-                  event EventHandler<GameLaunchedEventArgs> GameLaunched;
-                  event EventHandler<SaveLoadedEventArgs> SaveLoaded;
-                  event EventHandler<DayStartedEventArgs> DayStarted;
-                  event EventHandler<UpdateTickedEventArgs> UpdateTicked;
-              }
+          namespace StardewModdingAPI.Events {
+              public interface IGameLoopEvents { event EventHandler<GameLaunchedEventArgs> GameLaunched; event EventHandler<SaveLoadedEventArgs> SaveLoaded; event EventHandler<DayStartedEventArgs> DayStarted; event EventHandler<UpdateTickedEventArgs> UpdateTicked; }
               public interface IPlayerEvents { event EventHandler<WarpedEventArgs> Warped; }
-              public interface IInputEvents
-              {
-                  event EventHandler<ButtonPressedEventArgs> ButtonPressed;
-                  event EventHandler<ButtonReleasedEventArgs> ButtonReleased;
-              }
-              public interface IDisplayEvents
-              {
-                  event EventHandler<RenderedWorldEventArgs> RenderedWorld;
-                  event EventHandler<RenderedHudEventArgs> RenderedHud;
-              }
+              public interface IInputEvents { event EventHandler<ButtonPressedEventArgs> ButtonPressed; event EventHandler<ButtonReleasedEventArgs> ButtonReleased; }
+              public interface IDisplayEvents { event EventHandler<RenderedWorldEventArgs> RenderedWorld; event EventHandler<RenderedHudEventArgs> RenderedHud; }
               public interface IContentEvents { event EventHandler<AssetRequestedEventArgs> AssetRequested; }
-              public interface IModEvents
-              {
-                  IGameLoopEvents GameLoop { get; } IPlayerEvents Player { get; }
-                  IInputEvents Input { get; } IDisplayEvents Display { get; } IContentEvents Content { get; }
-              }
-              public class GameLaunchedEventArgs : EventArgs { }
-              public class SaveLoadedEventArgs : EventArgs { }
-              public class DayStartedEventArgs : EventArgs { }
-              public class UpdateTickedEventArgs : EventArgs { }
-              public class WarpedEventArgs : EventArgs { public StardewValley.GameLocation NewLocation { get; } }
-              public class ButtonPressedEventArgs : EventArgs { public SButton Button { get; } public ICursorPosition Cursor { get; } }
-              public class ButtonReleasedEventArgs : EventArgs { public SButton Button { get; } public ICursorPosition Cursor { get; } }
-              public class RenderedWorldEventArgs : EventArgs { public SpriteBatch SpriteBatch { get; } }
-              public class RenderedHudEventArgs : EventArgs { public SpriteBatch SpriteBatch { get; } }
-              public class AssetRequestedEventArgs : EventArgs
-              {
-                  public IAssetName NameWithoutLocale { get; }
-                  public void LoadFrom(Func<object> load, AssetLoadPriority priority, string onBehalfOf = null) { }
-                  public void Edit(Action<IAssetData> apply, AssetEditPriority priority = AssetEditPriority.Default, string onBehalfOf = null) { }
-              }
-          }
-          EOF
-          dotnet build refs/smapi/StardewModdingAPI.csproj -c Release -o refs/out
+              public interface IModEvents { IGameLoopEvents GameLoop {get;} IPlayerEvents Player {get;} IInputEvents Input {get;} IDisplayEvents Display {get;} IContentEvents Content {get;} }
+              public class GameLaunchedEventArgs:EventArgs{} public class SaveLoadedEventArgs:EventArgs{} public class DayStartedEventArgs:EventArgs{} public class UpdateTickedEventArgs:EventArgs{}
+              public class WarpedEventArgs:EventArgs{ public StardewValley.GameLocation NewLocation {get;} }
+              public class ButtonPressedEventArgs:EventArgs{ public SButton Button {get;} public ICursorPosition Cursor {get;} }
+              public class ButtonReleasedEventArgs:EventArgs{ public SButton Button {get;} public ICursorPosition Cursor {get;} }
+              public class RenderedWorldEventArgs:EventArgs{ public SpriteBatch SpriteBatch {get;} }
+              public class RenderedHudEventArgs:EventArgs{ public SpriteBatch SpriteBatch {get;} }
+              public class AssetRequestedEventArgs:EventArgs{ public IAssetName NameWithoutLocale {get;} public void LoadFrom(Func<object> l, AssetLoadPriority p, string o=null){} public void Edit(Action<IAssetData> a, AssetEditPriority p=AssetEditPriority.Default, string o=null){} }
+          }''')
+          subprocess.run(["dotnet", "build", "refs/smapi/StardewModdingAPI.csproj", "-c", "Release", "-o", "refs/out"], check=True)
 
-          cat << 'EOF' > mod_src/manifest.json
-          {
-            "Name": "Grimoire of Despair - Ma Dao Thu Tuyet Vong",
-            "Author": "TriNguyen",
-            "Version": "1.0.0",
-            "Description": "Them Ma Dao Thu Tuyet Vong, Diet Ma Kiem, trang thai Dong Hoa Ac Ma, 12 Boss ham mo va su kien Ac Ma Tap Kich Thi Tran.",
-            "UniqueID": "TriNguyen.GrimoireOfDespair",
-            "EntryDll": "GrimoireOfDespair.dll",
-            "MinimumApiVersion": "4.0.0",
-            "UpdateKeys": []
-          }
-          EOF
+          # 5. Build ModEntry.cs co san trong repo
+          open("mod_src/GrimoireOfDespair.csproj", "w").write('<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><AssemblyName>GrimoireOfDespair</AssemblyName><RootNamespace>GrimoireOfDespair</RootNamespace><TargetFramework>net6.0</TargetFramework><LangVersion>latest</LangVersion></PropertyGroup><ItemGroup><Reference Include="MonoGame.Framework"><HintPath>../refs/out/MonoGame.Framework.dll</HintPath><Private>false</Private></Reference><Reference Include="StardewValley.GameData"><HintPath>../refs/out/StardewValley.GameData.dll</HintPath><Private>false</Private></Reference><Reference Include="Stardew Valley"><HintPath>../refs/out/Stardew Valley.dll</HintPath><Private>false</Private></Reference><Reference Include="StardewModdingAPI"><HintPath>../refs/out/StardewModdingAPI.dll</HintPath><Private>false</Private></Reference></ItemGroup></Project>')
+          shutil.copy("ModEntry.cs", "mod_src/ModEntry.cs")
+          subprocess.run(["dotnet", "build", "mod_src/GrimoireOfDespair.csproj", "-c", "Release", "-o", "build_out"], check=True)
 
-          cat << 'EOF' > mod_src/GrimoireOfDespair.csproj
-          <Project Sdk="Microsoft.NET.Sdk">
-            <PropertyGroup>
-              <AssemblyName>GrimoireOfDespair</AssemblyName>
-              <RootNamespace>GrimoireOfDespair</RootNamespace>
-              <Version>1.0.0</Version>
-              <TargetFramework>net6.0</TargetFramework>
-              <LangVersion>latest</LangVersion>
-            </PropertyGroup>
-            <ItemGroup>
-              <Reference Include="MonoGame.Framework"><HintPath>../refs/out/MonoGame.Framework.dll</HintPath><Private>false</Private></Reference>
-              <Reference Include="StardewValley.GameData"><HintPath>../refs/out/StardewValley.GameData.dll</HintPath><Private>false</Private></Reference>
-              <Reference Include="Stardew Valley"><HintPath>../refs/out/Stardew Valley.dll</HintPath><Private>false</Private></Reference>
-              <Reference Include="StardewModdingAPI"><HintPath>../refs/out/StardewModdingAPI.dll</HintPath><Private>false</Private></Reference>
-            </ItemGroup>
-          </Project>
-          EOF
+          # 6. Dong goi 1 lop .zip chuan SMAPI Android (chua GrimoireOfDespair/manifest.json)
+          os.makedirs("pkg/GrimoireOfDespair/assets", exist_ok=True)
+          shutil.copy("manifest.json", "pkg/GrimoireOfDespair/manifest.json")
+          shutil.copy("build_out/GrimoireOfDespair.dll", "pkg/GrimoireOfDespair/GrimoireOfDespair.dll")
+          if os.path.isdir("assets"):
+              for f in os.listdir("assets"):
+                  p = os.path.join("assets", f)
+                  if os.path.isfile(p):
+                      shutil.copy(p, "pkg/GrimoireOfDespair/assets/" + f)
+          shutil.make_archive("GrimoireOfDespair-Android", "zip", "pkg", "GrimoireOfDespair")
+          PYEOF
 
-          cp ModEntry.cs mod_src/ModEntry.cs || true
-          dotnet build mod_src/GrimoireOfDespair.csproj -c Release -o build_out
-
-          mkdir -p pkg/GrimoireOfDespair/assets
-          cp mod_src/manifest.json pkg/GrimoireOfDespair/manifest.json
-          cp build_out/GrimoireOfDespair.dll pkg/GrimoireOfDespair/GrimoireOfDespair.dll
-          cp -r assets/* pkg/GrimoireOfDespair/assets/ 2>/dev/null || true
-
-          python3 -c "
-          import shutil
-          shutil.make_archive('GrimoireOfDespair-Android', 'zip', 'pkg', 'GrimoireOfDespair')
-          "
-
-      - name: Create Direct Download Release
-        
+      - name: Publish Direct Download Zip to Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: "GrimoireOfDespair Android Mod v1.0.${{ github.run_number }}"
+          files: GrimoireOfDespair-Android.zip
+          
