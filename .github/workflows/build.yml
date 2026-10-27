@@ -5,6 +5,9 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -17,12 +20,11 @@ jobs:
         with:
           dotnet-version: '6.0.x'
 
-      - name: Generate Reference Assemblies & Compile Mod
+      - name: Compile & Package Standard SMAPI Zip
         run: |
           set -e
           mkdir -p refs/mg refs/gd refs/sdv refs/smapi refs/out mod_src
 
-          # 1. Tao thu vien tham chieu MonoGame.Framework
           cat << 'EOF' > refs/mg/MonoGame.Framework.csproj
           <Project Sdk="Microsoft.NET.Sdk">
             <PropertyGroup>
@@ -100,7 +102,6 @@ jobs:
           EOF
           dotnet build refs/mg/MonoGame.Framework.csproj -c Release -o refs/out
 
-          # 2. Tao thu vien tham chieu StardewValley.GameData
           cat << 'EOF' > refs/gd/StardewValley.GameData.csproj
           <Project Sdk="Microsoft.NET.Sdk">
             <PropertyGroup>
@@ -135,7 +136,6 @@ jobs:
           EOF
           dotnet build refs/gd/StardewValley.GameData.csproj -c Release -o refs/out
 
-          # 3. Tao thu vien tham chieu Stardew Valley
           cat << 'EOF' > refs/sdv/StardewValley.csproj
           <Project Sdk="Microsoft.NET.Sdk">
             <PropertyGroup>
@@ -173,13 +173,9 @@ jobs:
               }
               public class Farmer : Character
               {
-                  public int health;
-                  public int maxHealth;
-                  public int deepestMineLevel;
-                  public bool temporarilyInvincible;
-                  public int temporaryInvincibilityTimer;
-                  public int Money { get; set; }
-                  public Item CurrentItem { get; set; }
+                  public int health; public int maxHealth; public int deepestMineLevel;
+                  public bool temporarilyInvincible; public int temporaryInvincibilityTimer;
+                  public int Money { get; set; } public Item CurrentItem { get; set; }
                   public bool addItemToInventoryBool(Item item, bool makeActiveObject = false) => true;
                   public bool hasItemInInventoryNamed(string name) => false;
                   public void takeDamage(int damage, bool overrideParry, Monsters.Monster damager) { }
@@ -197,16 +193,10 @@ jobs:
               }
               public static class Game1
               {
-                  public static GraphicsDeviceManager graphics;
-                  public static GameTime currentGameTime;
-                  public static Random random = new Random();
-                  public static float flashAlpha;
-                  public static int dayOfMonth;
-                  public static Rectangle clientBounds;
-                  public static SpriteFont smallFont;
-                  public static SpriteFont dialogueFont;
-                  public static Farmer player { get; set; }
-                  public static GameLocation currentLocation { get; set; }
+                  public static GraphicsDeviceManager graphics; public static GameTime currentGameTime;
+                  public static Random random = new Random(); public static float flashAlpha; public static int dayOfMonth;
+                  public static Rectangle clientBounds; public static SpriteFont smallFont; public static SpriteFont dialogueFont;
+                  public static Farmer player { get; set; } public static GameLocation currentLocation { get; set; }
                   public static void playSound(string cueName, int? pitch = null) { }
                   public static void addHUDMessage(HUDMessage message) { }
                   public static void drawObjectDialogue(string dialogue) { }
@@ -225,7 +215,6 @@ jobs:
           EOF
           dotnet build refs/sdv/StardewValley.csproj -c Release -o refs/out
 
-          # 4. Tao thu vien tham chieu StardewModdingAPI
           cat << 'EOF' > refs/smapi/StardewModdingAPI.csproj
           <Project Sdk="Microsoft.NET.Sdk">
             <PropertyGroup>
@@ -264,16 +253,12 @@ jobs:
               }
               public interface IModHelper
               {
-                  string DirectoryPath { get; }
-                  Events.IModEvents Events { get; }
-                  IModContentHelper ModContent { get; }
-                  IInputHelper Input { get; }
-                  IDataHelper Data { get; }
+                  string DirectoryPath { get; } Events.IModEvents Events { get; }
+                  IModContentHelper ModContent { get; } IInputHelper Input { get; } IDataHelper Data { get; }
               }
               public abstract class Mod
               {
-                  public IMonitor Monitor { get; set; }
-                  public IModHelper Helper { get; set; }
+                  public IMonitor Monitor { get; set; } public IModHelper Helper { get; set; }
                   public abstract void Entry(IModHelper helper);
               }
               public static class Context { public static bool IsWorldReady { get; } public static bool IsPlayerFree { get; } }
@@ -329,7 +314,6 @@ jobs:
           EOF
           dotnet build refs/smapi/StardewModdingAPI.csproj -c Release -o refs/out
 
-          # 5. Tao file manifest.json, GrimoireOfDespair.csproj va ModEntry.cs chuan
           cat << 'EOF' > mod_src/manifest.json
           {
             "Name": "Grimoire of Despair - Ma Dao Thu Tuyet Vong",
@@ -361,6 +345,18 @@ jobs:
           </Project>
           EOF
 
-          cat << 'EOF' > mod_src/ModEntry.cs
-          using System;
-          usi
+          cp ModEntry.cs mod_src/ModEntry.cs || true
+          dotnet build mod_src/GrimoireOfDespair.csproj -c Release -o build_out
+
+          mkdir -p pkg/GrimoireOfDespair/assets
+          cp mod_src/manifest.json pkg/GrimoireOfDespair/manifest.json
+          cp build_out/GrimoireOfDespair.dll pkg/GrimoireOfDespair/GrimoireOfDespair.dll
+          cp -r assets/* pkg/GrimoireOfDespair/assets/ 2>/dev/null || true
+
+          python3 -c "
+          import shutil
+          shutil.make_archive('GrimoireOfDespair-Android', 'zip', 'pkg', 'GrimoireOfDespair')
+          "
+
+      - name: Create Direct Download Release
+        
